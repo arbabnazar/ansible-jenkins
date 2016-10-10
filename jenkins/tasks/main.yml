@@ -1,0 +1,88 @@
+---
+- name: Install required packages
+  apt:
+    name: "{{ item }}"
+    update_cache: yes
+    state: present
+  with_items: "{{ jenkins_ubuntu_packages }}"
+
+- name: Install Jenkins
+  apt:
+    deb: "{{ JENKINS_DOWNLOAD_URL }}"
+    state: present
+
+- name: Configure Jenkins Prefix
+  lineinfile:
+    dest: /etc/default/jenkins
+    regexp: "^PREFIX="
+    line: "PREFIX={{jenkins_prefix}}"
+    state: present
+  notify:
+    - Restart Jenkins
+
+- name: Configure Jenkins Prefix in Launcher
+  lineinfile:
+    dest: /etc/default/jenkins
+    regexp: "^JENKINS_ARGS="
+    line: 'JENKINS_ARGS="--webroot=/var/cache/$NAME/war --httpPort=$HTTP_PORT --ajp13Port=$AJP_PORT --prefix=$PREFIX"'
+    state: present
+  notify:
+    - Restart Jenkins
+
+- name: Configure JVM Arguments
+  lineinfile:
+    dest: /etc/default/jenkins
+    regexp: '^JAVA_ARGS='
+    line: 'JAVA_ARGS="-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"'
+    state: present
+  notify:
+    - Restart Jenkins
+
+- name: Make Jenkins plugins directory
+  file:
+    path: "{{ jenkins_plugins_directory }}"
+    state: directory
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+
+- name: Download and Install Jenkins plugins
+  get_url:
+    url: "http://updates.jenkins-ci.org/download/plugins/{{ item.name }}/{{ item.version }}/{{ item.name }}.hpi"
+    dest: "{{ jenkins_plugins_directory }}/{{ item.name }}.hpi"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+  with_items: "{{ jenkins_recommended_plugins }}"
+  register: jenkins_plugin_downloads
+  notify:
+    - Restart Jenkins
+
+- meta: flush_handlers
+
+- name: Create Jenkins init Script Directory
+  file:
+    path: "{{ jenkins_home }}/init.groovy.d"
+    state: directory
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0755
+
+- name: Copy the Jenkins Groovy Script to "{{ jenkins_groovy_directory }}"
+  template:
+    src: "{{ item }}"
+    dest: "{{ jenkins_groovy_directory }}/{{ item.rstrip('.j2') }}"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0744
+  with_items: "{{ jenkins_groovy_scripts }}"
+  notify:
+    - Restart Jenkins
+
+- name: Configure Jenkins E-mail
+  template:
+    src: jenkins_email.j2
+    dest: "{{ jenkins_home }}/hudson.tasks.Mailer.xml"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0644
+  notify:
+    - Restart Jenkins

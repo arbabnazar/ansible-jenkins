@@ -1,0 +1,54 @@
+---
+- name: Install the required Apache packages
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items: "{{ apache_ubuntu_packages }}"
+
+- name: Create Directory Structure in Apache
+  file:
+    path: "{{ item.path }}" 
+    state: "{{ item.state | default('directory') }}" 
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0755') }}"
+  with_items:
+    - { path: '/etc/apache2/sites-available' }
+    - { path: '/etc/apache2/sites-enabled' }
+    - { path: '/var/www/html', state: absent }
+    - { path: '/etc/apache2/sites-enabled/000-default.conf', state: absent }
+
+- name: Modify the Timeout settings in /etc/apache2/apache2.conf
+  lineinfile:
+    dest: "/etc/apache2/apache2.conf"
+    state: present
+    regexp: "^Timeout"
+    line: "Timeout 600"
+
+- name: Load the Apache module
+  apache2_module:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - proxy_http
+    - rewrite
+  notify:
+    - Restart Apache2
+
+- name: Create the Apache2 Virutal Hosts
+  template: 
+    src:  virtualhost.j2
+    dest: "/etc/apache2/sites-available/{{ item.sitename }}.conf"
+  with_items: "{{ APACHE_SITES }}"
+  notify:
+    - Restart Apache2
+
+- name: Enable Config | Apache2 | Standard
+  file:
+    src: "/etc/apache2/sites-available/{{ item.sitename }}.conf"
+    dest: "/etc/apache2/sites-enabled/{{ item.sitename }}.conf"
+    state: "{{ item.state }}"
+  with_items: "{{ APACHE_SITES }}"
+  notify:
+    - Restart Apache2

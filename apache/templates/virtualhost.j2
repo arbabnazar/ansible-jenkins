@@ -1,0 +1,39 @@
+<VirtualHost *:{{ item.listen | default('80') }}>
+    ServerName {{ item.servername }}
+{% if item.serveralias is defined %}
+    ServerAlias {{ item.serveralias | join(' ') }}
+{% endif %}
+    ServerAdmin {{ item.serveradmin }}  
+    ErrorLog /var/log/apache2/{{ item.sitename }}-error.log
+    CustomLog /var/log/apache2/{{ item.sitename }}-access.log common
+
+{% if item.rewrite is defined | default(omit) %}
+    RewriteEngine on
+    RewriteCond %{SERVER_PORT} !^443$
+    RewriteRule ^/(.*) https://%{HTTP_HOST}/$1 [NC,R,L]
+{% endif %}
+
+
+{% if item.ssl is defined | default(omit) %}
+    ProxyRequests     Off
+    SSLEngine on
+    SSLProtocol -all +TLSv1 +SSLv3
+    SSLCipherSuite HIGH:MEDIUM:!aNULL:+SHA1:+MD5:+HIGH:+MEDIUM
+
+    SSLCertificateFile    {{ ssl_cert_path }}
+    SSLCertificateKeyFile {{ ssl_key_path }}
+    SSLCertificateChainFile {{ ssl_chain_path }}
+
+    ProxyTimeout      1800
+    ProxyPreserveHost on
+    ProxyPass         /  http://localhost:{{ redirect_port }}/
+    ProxyPassReverse  /  http://localhost:{{ redirect_port }}/
+    ProxyPassReverse  /  https://{{ item.servername }}/
+
+    <Proxy http://localhost:{{ redirect_port }}/*>
+        Order allow,deny
+        Allow from all
+    </Proxy>
+{% endif %}
+</VirtualHost>
+

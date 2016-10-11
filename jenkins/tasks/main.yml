@@ -60,7 +60,7 @@
 
 - name: Create Jenkins init Script Directory
   file:
-    path: "{{ jenkins_home }}/init.groovy.d"
+    path: "{{ jenkins_groovy_directory }}"
     state: directory
     owner: "{{ jenkins_user }}"
     group: "{{ jenkins_group }}"

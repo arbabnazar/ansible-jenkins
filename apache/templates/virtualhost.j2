@@ -26,13 +26,12 @@
 
     ProxyTimeout      1800
     ProxyPreserveHost on
-    ProxyPass         /  http://localhost:{{ redirect_port }}/
+    ProxyPass         /  http://localhost:{{ redirect_port }}/ retry=1 acquire=3000 timeout=600 Keepalive=On
     ProxyPassReverse  /  http://localhost:{{ redirect_port }}/
     ProxyPassReverse  /  https://{{ item.servername }}/
 
     <Proxy http://localhost:{{ redirect_port }}/*>
-        Order allow,deny
-        Allow from all
+        Require all granted
     </Proxy>
 {% endif %}
 </VirtualHost>
